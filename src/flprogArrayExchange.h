@@ -56,8 +56,11 @@ template<class T> class FlprogExchangeTypedArray : public FlprogAbstractExchange
 public:
     using ReadFunction = T (*)(uint16_t index);
     using WriteFunction = void (*)(T value, uint16_t index);
-    FlprogExchangeTypedArray(uint16_t id, uint16_t size, ReadFunction read, WriteFunction write)
+    FlprogExchangeTypedArray(uint16_t id, uint16_t size, ReadFunction read = nullptr, WriteFunction write = nullptr)
         : FlprogAbstractExchangeArray(id, size), _read(read), _write(write) {}
+    // Назначать функции в setup(), до начала обмена. nullptr отключает направление.
+    void setReadFunction(ReadFunction read) { _read = read; }
+    void setWriteFunction(WriteFunction write) { _write = write; }
     bool canRead() const override { return _read != nullptr; }
     bool canWrite() const override { return _write != nullptr && writeEnabled(); }
 protected:

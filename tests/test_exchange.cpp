@@ -37,12 +37,26 @@ String rs(uint16_t i){return names[i];}void ws(String v,uint16_t i){++writes;nam
 std::string frame(const std::string& s){char b[8];snprintf(b,sizeof b,"*%04X\n",(unsigned)FlprogUartArrayExchange::crc16(s.data(),s.size()));return s+b;}
 int main(){
     Uart uart; FlprogUartArrayExchange ex;
-    FlprogExchangeInt16Array a(1,2,ri,wi);FlprogExchangeBoolArray b(2,1,rb,wb);FlprogExchangeStringArray c(3,1,rs,ws);
+    FlprogExchangeInt16Array a(1,2);FlprogExchangeBoolArray b(2,1);FlprogExchangeStringArray c(3,1);
     FlprogExchangeInt16Array ro(4,2,ri,nullptr);FlprogAbstractExchangeArray* arr[]={&a,&b,&c,&ro};
     ex.setUart(&uart,1);assert(ex.setArrays(arr,4));c.setName("Title");c.setMaxLength(20);
     int tests=0;
     auto raw=[&](std::string wire,std::string expected){uart.rx=wire;uart.pos=0;uart.tx.clear();for(int i=0;i<500;++i)ex.pool();assert(uart.tx==frame(expected));++tests;};
     auto send=[&](std::string s,std::string expected,bool crc){raw(crc?frame(s):s+"\n",expected);};
+    // All types begin with null callbacks; protocol must not call them.
+    assert(!a.canRead() && !a.canWrite() && !b.canRead() && !b.canWrite() && !c.canRead() && !c.canWrite());
+    send("DESCRIBE;2","OK;ARRAY;3;3;1;0;20;5469746C65",false);
+    send("GET;3;0","ERROR;READ_DISABLED",false);
+    ex.setWriteEnable(true);
+    send("BEGIN;1","OK;BEGIN;1",true);
+    send("SET;3;0;41","ERROR;WRITE_DISABLED",true);
+    send("CANCEL","OK;CANCELLED",true);
+    ex.setWriteEnable(false);
+    a.setReadFunction(ri);a.setWriteFunction(wi);
+    b.setReadFunction(rb);b.setWriteFunction(wb);
+    c.setReadFunction(rs);c.setWriteFunction(ws);
+    assert(a.canRead() && a.canWrite() && b.canRead() && b.canWrite() && c.canRead() && c.canWrite());
+    c.setWriteFunction(nullptr);assert(!c.canWrite());c.setWriteFunction(ws);
     assert(FlprogUartArrayExchange::crc16("123456789",9)==0x29B1);
     send("PING","OK;PONG",false);send("INFO","OK;INFO;1;4;64;"+std::to_string(FLPROG_EXCHANGE_TRANSACTION_BUFFER_SIZE)+";64;0",false);
     send("BEGIN;1","ERROR;WRITE_DISABLED",true);ex.setWriteEnable(true);
